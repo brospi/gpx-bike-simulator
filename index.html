@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPX Bike Speed Simulator</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚴</text></svg>">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Left Sidebar -->
+        <aside class="sidebar">
+            <header class="sidebar-header">
+                <h1>🚴 GPX Bike Simulator</h1>
+                <button id="info-btn" class="info-btn" title="How it works">?</button>
+            </header>
+
+            <div class="sidebar-content">
+                <div class="file-upload">
+                    <label for="gpx-file">GPX File:</label>
+                    <input type="file" id="gpx-file" accept=".gpx,application/gpx+xml">
+                    <span class="hint">Tour de France 2026 - Étape 20 loaded by default</span>
+                </div>
+
+                <div class="parameters">
+                    <h3>Cyclist Parameters</h3>
+                    
+                    <div class="param-item">
+                        <label for="weight">Total Weight (kg):</label>
+                        <div class="input-slider-group">
+                            <input type="number" id="weight" class="param-number" value="85" min="40" max="200" step="0.1">
+                            <input type="range" id="weight-slider" class="param-slider" value="85" min="40" max="200" step="0.1">
+                        </div>
+                        <span class="hint">Bike + Cyclist</span>
+                    </div>
+                    
+                    <div class="param-item">
+                        <label for="cda">CdA (m²):</label>
+                        <div class="input-slider-group">
+                            <input type="number" id="cda" class="param-number" value="0.33" min="0.1" max="1" step="0.01">
+                            <input type="range" id="cda-slider" class="param-slider" value="0.33" min="0.1" max="1" step="0.01">
+                        </div>
+                        <span class="hint">Aerodynamic drag</span>
+                    </div>
+                    
+                    <div class="param-item">
+                        <label for="pmax">Pmax (W):</label>
+                        <div class="input-slider-group">
+                            <input type="number" id="pmax" class="param-number" value="250" min="0" max="400" step="1">
+                            <input type="range" id="pmax-slider" class="param-slider" value="250" min="0" max="400" step="1">
+                        </div>
+                        <span class="hint">Maximum power</span>
+                    </div>
+                    
+                    <div class="param-item">
+                        <label for="vmax">Vmax (km/h):</label>
+                        <div class="input-slider-group">
+                            <input type="number" id="vmax" class="param-number" value="50" min="0" max="100" step="0.1">
+                            <input type="range" id="vmax-slider" class="param-slider" value="50" min="0" max="100" step="0.1">
+                        </div>
+                        <span class="hint">Maximum speed</span>
+                    </div>
+                </div>
+                
+                <div id="sidebar-results" class="sidebar-results" style="display: none;">
+                    <div class="results-header">
+                        <h3>Results <span id="segment-indicator"></span></h3>
+                        <button id="reset-zoom" class="reset-btn-small" style="display: none;">Clear</button>
+                    </div>
+                    
+                    <div class="summary-sidebar">
+                        <div class="summary-card-sidebar">
+                            <h4>Total Time</h4>
+                            <p id="total-time">--</p>
+                        </div>
+                        <div class="summary-card-sidebar">
+                            <h4>Distance</h4>
+                            <p id="total-distance">--</p>
+                        </div>
+                        <div class="summary-card-sidebar">
+                            <h4>Avg Speed</h4>
+                            <p id="avg-speed">--</p>
+                        </div>
+                        <div class="summary-card-sidebar">
+                            <h4>Avg Power</h4>
+                            <p id="avg-power">--</p>
+                        </div>
+                    </div>
+                    
+                    <div class="selection-hint-sidebar">
+                        💡 Hold SHIFT and drag to select
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div id="results" class="results" style="display: none;">
+
+            <div class="map-container">
+                <h3>Route Map</h3>
+                <div id="map"></div>
+            </div>
+
+            <div class="charts">
+                <div class="chart-container">
+                    <h3>Elevation Profile</h3>
+                    <canvas id="elevation-chart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>Slope (Grade)</h3>
+                    <canvas id="slope-chart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>Speed Profile</h3>
+                    <canvas id="speed-chart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>Power Output</h3>
+                    <canvas id="power-chart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>Progress Over Time</h3>
+                    <canvas id="progress-chart"></canvas>
+                </div>
+            </div>
+        </div>
+        </main>
+    </div>
+
+    <!-- Physics Modal -->
+    <div id="physics-modal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close">&times;</span>
+            <h2>📐 Physics Behind the Simulation</h2>
+            
+            <section class="modal-section">
+                <h3>Forces Acting on the Cyclist</h3>
+                <p>The simulation calculates the total resistive force as the sum of three components:</p>
+                
+                <div class="equation-block">
+                    <strong>Total Force:</strong>
+                    <code>F<sub>total</sub> = F<sub>gravity</sub> + F<sub>rolling</sub> + F<sub>air</sub></code>
+                </div>
+            </section>
+
+            <section class="modal-section">
+                <h3>1. Gravity Force</h3>
+                <p>The component of gravitational force along the slope:</p>
+                <div class="equation-block">
+                    <code>F<sub>gravity</sub> = m · g · sin(θ)</code>
+                </div>
+                <ul class="param-list">
+                    <li><strong>m</strong> = Total mass (cyclist + bike) in kg</li>
+                    <li><strong>g</strong> = 9.81 m/s² (gravitational acceleration)</li>
+                    <li><strong>θ</strong> = arctan(grade) — slope angle</li>
+                </ul>
+            </section>
+
+            <section class="modal-section">
+                <h3>2. Rolling Resistance</h3>
+                <p>Friction between tires and road surface:</p>
+                <div class="equation-block">
+                    <code>F<sub>rolling</sub> = m · g · cos(θ) · C<sub>rr</sub></code>
+                </div>
+                <ul class="param-list">
+                    <li><strong>C<sub>rr</sub></strong> = 0.004 (rolling resistance coefficient for road bike tires)</li>
+                </ul>
+            </section>
+
+            <section class="modal-section">
+                <h3>3. Aerodynamic Drag</h3>
+                <p>Air resistance increases with the square of velocity:</p>
+                <div class="equation-block">
+                    <code>F<sub>air</sub> = ½ · ρ · CdA · v²</code>
+                </div>
+                <ul class="param-list">
+                    <li><strong>ρ</strong> = 1.225 kg/m³ (air density at sea level)</li>
+                    <li><strong>CdA</strong> = Drag coefficient × Frontal area (m²)</li>
+                    <li><strong>v</strong> = Velocity in m/s</li>
+                </ul>
+            </section>
+
+            <section class="modal-section">
+                <h3>Power Equation</h3>
+                <p>Power required to overcome all forces at velocity v:</p>
+                <div class="equation-block highlight">
+                    <code>P = F<sub>total</sub> · v = (F<sub>gravity</sub> + F<sub>rolling</sub> + F<sub>air</sub>) · v</code>
+                </div>
+            </section>
+
+            <section class="modal-section">
+                <h3>Speed Calculation Logic</h3>
+                <p>For each segment, the simulator determines speed based on two constraints:</p>
+                <ol class="logic-list">
+                    <li><strong>If P(V<sub>max</sub>) ≤ P<sub>max</sub>:</strong> The cyclist can reach maximum speed V<sub>max</sub> with available power. Speed = V<sub>max</sub>, Power = P(V<sub>max</sub>)</li>
+                    <li><strong>Otherwise:</strong> The cyclist is power-limited. Binary search finds the speed where P = P<sub>max</sub>. Speed = calculated, Power = P<sub>max</sub></li>
+                </ol>
+            </section>
+
+            <section class="modal-section">
+                <h3>Typical CdA Values</h3>
+                <table class="cda-table">
+                    <tr><td>Upright city bike</td><td>0.8 - 1.0 m²</td></tr>
+                    <tr><td>Road bike (hoods)</td><td>0.35 - 0.40 m²</td></tr>
+                    <tr><td>Road bike (drops)</td><td>0.30 - 0.35 m²</td></tr>
+                    <tr><td>Time trial position</td><td>0.22 - 0.28 m²</td></tr>
+                    <tr><td>Recumbent bike</td><td>0.10 - 0.15 m²</td></tr>
+                </table>
+            </section>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
+
